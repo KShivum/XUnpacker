@@ -27,7 +27,9 @@ int main()
     int currentDirectories = 0;
     int directoryOffset = 0;
     map<int, string> directoryMap;
-    directoryMap.insert(pair<int, string>(0, ""));
+    string currentDirectory;
+    currentDirectory = fs::current_path().string();
+    directoryMap.insert(pair<int, string>(0, currentDirectory));
     while (currentDirectories < dirCount)
     {
         baseFile.seekg(dirOffset + directoryOffset);
