@@ -1,9 +1,10 @@
-#include<iostream>
-#include<fstream>
+#include <iostream>
+#include <fstream>
 #include <filesystem>
 #include <string>
+#include <map>
 using namespace std;
-//namespace fs = std::filesystem;
+// namespace fs = std::filesystem;
 namespace fs = std::filesystem;
 int main()
 {
@@ -13,61 +14,76 @@ int main()
     ifstream baseFile;
     baseFile.open("base.x", ios::binary | ios::in);
 
-    baseFile.read((char*)&packId, sizeof(uint32_t));
-    baseFile.read((char*)&verId, sizeof(uint32_t));
-    baseFile.read((char*)&dirCount, sizeof(uint32_t));
-    baseFile.read((char*)&dirOffset, sizeof(uint32_t));
-    baseFile.read((char*)&fileCount, sizeof(uint32_t));
-    baseFile.read((char*)&fileOffset, sizeof(uint32_t));
-    baseFile.read((char*)emptySpace, 32);
+    baseFile.read((char *)&packId, sizeof(uint32_t));
+    baseFile.read((char *)&verId, sizeof(uint32_t));
+    baseFile.read((char *)&dirCount, sizeof(uint32_t));
+    baseFile.read((char *)&dirOffset, sizeof(uint32_t));
+    baseFile.read((char *)&fileCount, sizeof(uint32_t));
+    baseFile.read((char *)&fileOffset, sizeof(uint32_t));
+    baseFile.read((char *)emptySpace, 32);
 
-    //Create directories
+    // Create directories
 
     int currentDirectories = 0;
     int directoryOffset = 0;
-    while(currentDirectories < dirCount)
+    map<int, string> directoryMap;
+    directoryMap.insert(pair<int, string>(0, ""));
+    while (currentDirectories < dirCount)
     {
         baseFile.seekg(dirOffset + directoryOffset);
         uint8_t dirNameLength;
-        baseFile.read((char*)&dirNameLength, sizeof(uint8_t));
+        baseFile.read((char *)&dirNameLength, sizeof(uint8_t));
         char dirName[dirNameLength + 1];
-        baseFile.read((char*)dirName, dirNameLength);
+        baseFile.read((char *)dirName, dirNameLength);
         dirName[dirNameLength] = '\0';
         string dirNameString(dirName);
-        while(dirNameString.find("\\") != string::npos)
+        while (dirNameString.find("\\") != string::npos)
         {
             dirNameString.replace(dirNameString.find("\\"), 1, "/");
         }
+        cout << "Creating Directory: " << dirNameString << endl;
         fs::create_directories(dirNameString);
         directoryOffset += dirNameLength + 1;
+        directoryMap.insert(pair<int, string>(currentDirectories+1, dirNameString));
         currentDirectories++;
     }
 
+    cout << endl << endl << "------------------Creating Files------------------" << endl;
 
+    // Create files
+    int currentFiles = 0;
+    int fileCurrentOffset = 0;
+    while (currentFiles < fileCount)
+    {
+        baseFile.seekg(fileOffset + fileCurrentOffset);
+        uint32_t dirIndex, dataOffset, dataSize;
+        uint8_t fileSize;
 
+        baseFile.read((char *)&dirIndex, sizeof(uint32_t));
+        baseFile.read((char *)&fileSize, sizeof(uint8_t));
+        char *fileName = (char *)malloc(fileSize + 1);
+        baseFile.read(fileName, fileSize);
+        baseFile.read((char *)&dataOffset, sizeof(uint32_t));
+        baseFile.read((char *)&dataSize, sizeof(uint32_t));
 
+        baseFile.seekg(dataOffset);
+        char *fileData = (char *)malloc(dataSize);
+        baseFile.read(fileData, dataSize);
 
+        fileName[fileSize] = '\0';
+        string fileNameString(fileName);
 
-    /*
-    int firstFile = fileOffset;
-    //Read file data
-    baseFile.seekg(firstFile);
-    uint32_t dirIndex, dataOffset, dataSize;
-    uint8_t fileSize;
+        string dirName = directoryMap.at(dirIndex);
 
-    baseFile.read((char*)&dirIndex, sizeof(uint32_t));
-    baseFile.read((char*)&fileSize, sizeof(uint8_t));
-    char *fileName = (char*)malloc(fileSize);
-    baseFile.read(fileName, fileSize);
-    baseFile.read((char*)&dataOffset, sizeof(uint32_t));
-    baseFile.read((char*)&dataSize, sizeof(uint32_t));
+        ofstream file;
+        file.open(dirName + "/" + fileNameString, ios::binary | ios::out);
+        cout << "Creating File: " << dirName << "/" << fileNameString << endl;
+        file.write(fileData, dataSize);
+        file.close();
+        currentFiles++;
+        fileCurrentOffset += fileSize + 4 + 1 + 4 + 4;
+    }
 
-    baseFile.seekg(dataOffset);
-    char *fileData = (char*)malloc(dataSize);
-    baseFile.read(fileData, dataSize);
-    cout << fileName << endl;
-    cout << fileData << endl;
-    */
+    
     return 0;
-
 }
