@@ -1,18 +1,31 @@
 #include <iostream>
+#include <stdio.h>
 #include <fstream>
 #include <filesystem>
-#include <string>
+#include <string.h>
+#include <vector>
 #include <map>
 using namespace std;
 // namespace fs = std::filesystem;
 namespace fs = std::filesystem;
-int main()
+
+void Help()
+{
+    cout << "This program unpacks and packs ARTS's .x file" << endl
+         << endl;
+    cout << "Usage:" << endl;
+    cout << "\tUnpacker[.exe] {-u, -p} {directory}" << endl;
+    cout << "\t-u for unpacking and the directory to the base.x file" << endl;
+    cout << "\t-p for packing and the directory to the directory to be packed" << endl;
+}
+
+void UnPack(string directory)
 {
     uint32_t packId, verId, dirCount, dirOffset, fileCount, fileOffset;
     uint8_t emptySpace[32];
     char test[1000];
     ifstream baseFile;
-    baseFile.open("base.x", ios::binary | ios::in);
+    baseFile.open(directory, ios::binary | ios::in);
 
     baseFile.read((char *)&packId, sizeof(uint32_t));
     baseFile.read((char *)&verId, sizeof(uint32_t));
@@ -46,11 +59,13 @@ int main()
         cout << "Creating Directory: " << dirNameString << endl;
         fs::create_directories(dirNameString);
         directoryOffset += dirNameLength + 1;
-        directoryMap.insert(pair<int, string>(currentDirectories+1, dirNameString));
+        directoryMap.insert(pair<int, string>(currentDirectories + 1, dirNameString));
         currentDirectories++;
     }
 
-    cout << endl << endl << "------------------Creating Files------------------" << endl;
+    cout << endl
+         << endl
+         << "------------------Creating Files------------------" << endl;
 
     // Create files
     int currentFiles = 0;
@@ -85,7 +100,44 @@ int main()
         currentFiles++;
         fileCurrentOffset += fileSize + 4 + 1 + 4 + 4;
     }
+}
 
-    
+void Pack(string directory)
+{
+    map<int, string> directories;
+    directories.insert(pair<int, string>(0, directory))
+    vector<string> files;
+    for (auto &p : std::filesystem::recursive_directory_iterator(directory))
+    {
+        if (p.is_directory())
+        {
+
+        }
+        else
+        {
+            files.push_back(p.path().filename())
+        }
+    }
+}
+
+int main(int argc, char **argv)
+{
+    if (argc != 2 || strcmp(argv[1], "--help") == 0)
+    {
+        Help();
+    }
+
+    if (strcmp(argv[1], "-u") != 0 && strcmp(argv[1], "-p") != 0)
+    {
+        cout << "Invalid functional argument" << endl;
+        Help();
+    }
+
+    if (strcmp(argv[1], "-u") == 0)
+    {
+        string directory(argv[2]);
+        UnPack(directory);
+    }
+
     return 0;
 }
