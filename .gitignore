@@ -32,3 +32,5 @@
 *.app
 
 Unpacker
+
+Temp/

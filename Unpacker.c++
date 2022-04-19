@@ -105,38 +105,48 @@ void UnPack(string directory)
 void Pack(string directory)
 {
     map<int, string> directories;
-    directories.insert(pair<int, string>(0, directory))
+    directories.insert(pair<int, string>(0, directory));
     vector<string> files;
+    int dirIndex = 1;
     for (auto &p : std::filesystem::recursive_directory_iterator(directory))
     {
         if (p.is_directory())
         {
-
+            directories.insert(pair<int, string>(dirIndex,p.path().string()));
+            dirIndex++;
         }
         else
         {
-            files.push_back(p.path().filename())
+            files.push_back(p.path().filename());
         }
     }
+
 }
 
 int main(int argc, char **argv)
 {
-    if (argc != 2 || strcmp(argv[1], "--help") == 0)
+    if (argc != 3 || strcmp(argv[1], "--help") == 0)
     {
         Help();
+        return 0;
     }
 
     if (strcmp(argv[1], "-u") != 0 && strcmp(argv[1], "-p") != 0)
     {
         cout << "Invalid functional argument" << endl;
         Help();
+        return 0;
     }
 
     if (strcmp(argv[1], "-u") == 0)
     {
         string directory(argv[2]);
         UnPack(directory);
+    }
+    else
+    {
+        string directory(argv[2]);
+        Pack(directory);
     }
 
     return 0;
