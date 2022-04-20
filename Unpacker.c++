@@ -102,24 +102,79 @@ void UnPack(string directory)
     }
 }
 
+class FileInfo
+{
+public:
+    uint32_t dirIndex;
+    uint8_t fileNameSize;
+    string fileName;
+    uint32_t dataOffset;
+    uint32_t dataSize;
+};
+
 void Pack(string directory)
 {
     map<int, string> directories;
+    if (directory.at(directory.size() - 1) == '/')
+    {
+        directory.replace(directory.size() -1, 1, "\0");
+    }
     directories.insert(pair<int, string>(0, directory));
-    vector<string> files;
+    vector<FileInfo> files;
     int dirIndex = 1;
     for (auto &p : std::filesystem::recursive_directory_iterator(directory))
     {
         if (p.is_directory())
         {
-            directories.insert(pair<int, string>(dirIndex,p.path().string()));
+            directories.insert(pair<int, string>(dirIndex, p.path().string()));
             dirIndex++;
         }
         else
         {
-            files.push_back(p.path().filename());
+            FileInfo file;
+            file.fileName = p.path().filename().string();
+            string currentDirectory;
+            currentDirectory = p.path().string();
+            currentDirectory = currentDirectory.substr(0, currentDirectory.find_last_of("/"));
+            for (auto &i : directories)
+            {
+                string second(i.second);
+                if (currentDirectory.compare(second) == 0)
+                {
+                    file.dirIndex = i.first;
+                }
+            }
+            file.fileNameSize = file.fileName.size();
+            file.fileName = file.fileName.erase(file.fileNameSize);
+            files.push_back(file);
         }
+
     }
+    vector<char> fullFileData;
+    int currentOffset = 0;
+
+    //Read files and store data into vector
+    for(int i = 0; i < files.size(); i++)
+    {
+        ifstream file;
+        string fileDirectory = directories.at(files[i].dirIndex);
+        file.open(fileDirectory + "/" + files[i].fileName, ios::binary | ios::in);
+        //Stores the file data in the vector
+        file.seekg(0, ios::end);
+        files[i].dataSize = file.tellg();
+        file.seekg(0, ios::beg);
+        files[i].dataOffset = currentOffset;
+        char *fileData = (char *)malloc(files[i].dataSize);
+        file.read(fileData, files[i].dataSize);
+        fullFileData.insert(fullFileData.end(), fileData, fileData + files[i].dataSize);
+        currentOffset += files[i].dataSize;
+    }
+
+    //Create the header
+    uint32_t packId = (*((uint32_t*)"NORK"));
+    uint32_t verId = 0x001;
+    uint32_t dirCount = directories.size();
+
 
 }
 
