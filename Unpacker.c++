@@ -22,7 +22,7 @@ void Help()
 void UnPack(string directory)
 {
     uint32_t packId, verId, dirCount, dirOffset, fileCount, fileOffset;
-    uint8_t emptySpace[32];
+    char emptySpace[32];
     char test[1000];
     ifstream baseFile;
     baseFile.open(directory, ios::binary | ios::in);
@@ -57,7 +57,7 @@ void UnPack(string directory)
             dirNameString.replace(dirNameString.find("\\"), 1, "/");
         }
         cout << "Creating Directory: " << dirNameString << endl;
-        fs::create_directories(dirNameString);
+        //fs::create_directories(dirNameString);
         directoryOffset += dirNameLength + 1;
         directoryMap.insert(pair<int, string>(currentDirectories + 1, dirNameString));
         currentDirectories++;
@@ -117,49 +117,76 @@ void Pack(string directory)
     map<int, string> directories;
     if (directory.at(directory.size() - 1) == '/')
     {
-        directory.replace(directory.size() -1, 1, "\0");
+        directory.replace(directory.size() - 1, 1, "\0");
     }
     directories.insert(pair<int, string>(0, directory));
     vector<FileInfo> files;
     int dirIndex = 1;
+    int fileSize = 0;
+    cout << "------------------Scanning Files and Directories------------------" << endl;
     for (auto &p : std::filesystem::recursive_directory_iterator(directory))
     {
+
         if (p.is_directory())
         {
+            /*
+            cout << "Found Directory: " << p.path().string() << endl;
             directories.insert(pair<int, string>(dirIndex, p.path().string()));
             dirIndex++;
+            */
         }
         else
         {
+
             FileInfo file;
+            cout << "Found File: " << p.path().string() << endl;
             file.fileName = p.path().filename().string();
+            if (strcasecmp(file.fileName.c_str(), "base.x") == 0)
+            {
+                cout << "Error: base.x is a reserved file name" << endl;
+                continue;
+            }
+            else if (strcasecmp(file.fileName.c_str(), "Unpacker") == 0 || strcasecmp(file.fileName.c_str(), "Unpacker.exe") == 0)
+            {
+                cout << "Error: Unpacker is a reserved file name" << endl;
+                continue;
+            }
             string currentDirectory;
             currentDirectory = p.path().string();
             currentDirectory = currentDirectory.substr(0, currentDirectory.find_last_of("/"));
+            bool foundDir = false;
             for (auto &i : directories)
             {
                 string second(i.second);
                 if (currentDirectory.compare(second) == 0)
                 {
                     file.dirIndex = i.first;
+                    foundDir = true;
                 }
+            }
+            if (!foundDir)
+            {
+                directories.insert(pair<int, string>(dirIndex, currentDirectory));
+                file.dirIndex = dirIndex;
+                dirIndex++;
             }
             file.fileNameSize = file.fileName.size();
             file.fileName = file.fileName.erase(file.fileNameSize);
             files.push_back(file);
+            fileSize += file.fileNameSize + 1 + 4 + 4 + 4;
         }
-
     }
     vector<char> fullFileData;
-    int currentOffset = 0;
-
-    //Read files and store data into vector
-    for(int i = 0; i < files.size(); i++)
+    int currentOffset = 24 + 32;
+    cout << "------------------Reading File Data------------------" << endl;
+    // Read files and store data into vector
+    for (int i = 0; i < files.size(); i++)
     {
+        cout << "Reading File: " << files[i].fileName << endl;
         ifstream file;
         string fileDirectory = directories.at(files[i].dirIndex);
         file.open(fileDirectory + "/" + files[i].fileName, ios::binary | ios::in);
-        //Stores the file data in the vector
+        // Stores the file data in the vector
         file.seekg(0, ios::end);
         files[i].dataSize = file.tellg();
         file.seekg(0, ios::beg);
@@ -168,14 +195,67 @@ void Pack(string directory)
         file.read(fileData, files[i].dataSize);
         fullFileData.insert(fullFileData.end(), fileData, fileData + files[i].dataSize);
         currentOffset += files[i].dataSize;
+        file.close();
     }
 
-    //Create the header
-    uint32_t packId = (*((uint32_t*)"NORK"));
+    // Create the header
+    uint32_t packId = (*((uint32_t *)"NORK"));
     uint32_t verId = 0x001;
-    uint32_t dirCount = directories.size();
-
-
+    uint32_t dirCount = directories.size() - 1;
+    uint32_t dirOffset = fullFileData.size() + 24 + 32 + fileSize;
+    uint32_t fileCount = files.size();
+    uint32_t fileOffset = fullFileData.size() + 24 + 32;
+    char emptySpace[32];
+    memset(emptySpace, 0, 32);
+    ofstream outFile;
+    outFile.open(directory + "/" + "base.x", ios::binary | ios::out);
+    outFile.write((char *)&packId, sizeof(uint32_t));
+    outFile.write((char *)&verId, sizeof(uint32_t));
+    outFile.write((char *)&dirCount, sizeof(uint32_t));
+    outFile.write((char *)&dirOffset, sizeof(uint32_t));
+    outFile.write((char *)&fileCount, sizeof(uint32_t));
+    outFile.write((char *)&fileOffset, sizeof(uint32_t));
+    outFile.write(emptySpace, 32);
+    cout << "------------------Writing File Data------------------" << endl;
+    for (int i = 0; i < fullFileData.size(); i++)
+    {
+        outFile.write((char *)&fullFileData[i], sizeof(char));
+    }
+    cout << "------------------Writing File Info------------------" << endl;
+    for (int i = 0; i < files.size(); i++)
+    {
+        outFile.write((char *)&files[i].dirIndex, sizeof(uint32_t));
+        outFile.write((char *)&files[i].fileNameSize, sizeof(uint8_t));
+        outFile.write(files[i].fileName.c_str(), files[i].fileNameSize);
+        outFile.write((char *)&files[i].dataOffset, sizeof(uint32_t));
+        outFile.write((char *)&files[i].dataSize, sizeof(uint32_t));
+    }
+    cout << "------------------Writing Directory Info------------------" << endl;
+    for (int i = 1; i < directories.size(); i++)
+    {
+        size_t pos = directories.at(i).find(directory);
+        if (pos != string::npos)
+        {
+            if (pos != 0)
+            {
+                continue;
+            }
+            directories.at(i).replace(0, directory.size(), "");
+            if (directories.at(i).at(0) == '/')
+            {
+                directories.at(i).replace(0, 1, "");
+            }
+        }
+    }
+    for (int i = 1; i < directories.size(); i++)
+    {
+        uint8_t dirSize = directories.at(i).size();
+        outFile.write((char *)&dirSize, sizeof(uint8_t));
+        char *dirName = (char *)malloc(dirSize);
+        strcpy(dirName, directories.at(i).c_str());
+        outFile.write(dirName, dirSize);
+    }
+    outFile.close();
 }
 
 int main(int argc, char **argv)
