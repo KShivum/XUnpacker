@@ -5,7 +5,8 @@
         static void Main(string[] args)
         {
             //Temporary hardcode
-            XFileHandler.UnPack("base.x", "Test/");
+            //XFileHandler.Pack("Test/", "OutTest/base.x");
+            XFileHandler.UnPack("OutTest/base.x", "Test2/");
         }
     }
 }
