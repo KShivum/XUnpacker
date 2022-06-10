@@ -1,6 +1,6 @@
 Read this comment for the life of me when I work on this again.
 The only thing is, the offset to be used is the one that is actually in the header. For some reason the comment's written offset is wrong
-
+May be possible to use the empty space for personal packing items
 
 
 
